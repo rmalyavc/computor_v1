@@ -1,0 +1,58 @@
+.wrapper {
+	position: relative;
+	width: 100%;
+	display: flex;
+	justify-content: center;
+}
+
+.inner_wrapper {
+	width: 100%;
+	max-width: 500px;
+	display: block;
+}
+
+.inner_wrapper h4 {
+	width: 100%;
+	text-align: center; 
+}
+
+.form_field {
+	position: relative;
+	height: 25px;
+	width: 98%;
+	border-radius: 5px;
+	border: 2px solid rgba(200,200,200,0.3);
+	padding: 3px;
+	background: none;
+	transition: background 0.3s ease-out;
+}
+
+.main_button {
+	position: relative;
+	border-radius: 3px;
+	background: rgba(255,20,20,0.9);
+	border: 1px solid rgba(200,200,200,1);
+	cursor:pointer;
+	color: white;
+	width: 150px;
+	height: 30px;
+}
+
+.error_text {
+	font-size: 14px;
+	color: red;
+	float: left;
+	font-weight: 500;
+	opacity: 1;
+	transition: opacity 0.2s ease-out;
+}
+
+.hidden {
+	opacity: 0;
+	transition: opacity 0.2s ease-out;
+}
+
+.field_error {
+	background-color: rgba(255,20,20,0.6);
+	transition: background-color 0.3s ease-out;
+}

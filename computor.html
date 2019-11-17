@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Computor V1</title>
+	<link rel="stylesheet" href="./style.css">
+	<script type="text/javascript" src="./logic.js"></script>
+</head>
+<body>
+	<div class="wrapper">
+		<div class="inner_wrapper">
+			<h4>Please enter your equation here:</h4>
+			<h4>
+				<input id="input_text" class="form_field" onkeyup="on_keyup(event);">
+				<span class="error_text hidden" id="validation_message">Invalid format</span>
+			</h4>
+			<div class="wrapper">
+				<button type="button" id="submit_input" class="main_button" onclick="solve_eq();">
+					<strong>Solve</strong>
+				</button>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

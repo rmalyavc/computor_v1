@@ -126,27 +126,30 @@ function reduce_spare(parts) {
 			else
 				reduced.push(parts[i]);
 		}
-		else if (isNaN(parts[i]) && parts[i].indexOf('X^') != -1) {
-			let div_mults = div_mult_around(parts, i);
+		// else if (isNaN(parts[i]) && parts[i].indexOf('X^') != -1) {
+		// 	let div_mults = div_mult_around(parts, i);
+		// 	let mults = mult_around(parts, i);
 
-			if (div_mults == 2) {
-				reduced[reduced.length - 2] = eval(`${reduced[reduced.length - 2]}${parts[i + 1]}${parts[i + 2]}`);
-				parts[i + 2] = 1;
-				changed = true;
-				i += 2;
-			}
-			else {
-				let found = parts[i].findIndex((el, index) => {
-					return (el == parts[i] && i != index && div_mult_around(parts, index) != 0 && div_mult_around(parts, index) != 2); 
-				});
-				if (found != -1) {
-					changed = true;
-					let factor1 = 1;
-					if (div_mults == -1)
-						factor1 = parts[i - 2];
-				}
-			}
-		}
+		// 	if (div_mults == 2 && parts[i - 1] == '*') {
+		// 		reduced[reduced.length - 2] = eval(`${reduced[reduced.length - 2]}${parts[i + 1]}${parts[i + 2]}`);
+		// 		parts[i + 2] = 1;
+		// 		changed = true;
+		// 		i += 2;
+		// 	}
+		// 	else {
+		// 		let found = parts[i].findIndex((el, index) => {
+		// 			return (el == parts[i] && i != index && div_mult_around(parts, index) != 0 && div_mult_around(parts, index) != 2); 
+		// 		});
+		// 		if (found != -1) {
+		// 			changed = true;
+		// 			let factor1 = 1;
+		// 			if (mults == -1)
+		// 				factor1 = parts[i - 2];
+		// 			else if (mults == 1)
+		// 				factor1 = parts[i + 2];
+		// 		}
+		// 	}
+		// }
 		else {
 			reduced.push(parts[i]);
 		}
@@ -183,7 +186,7 @@ function mult_around(arr, i) {
 	else
 		return 0;
 }
-
+// "5 - 6 / x * 5x = 2"
 function get_parts(str) {
 	str = str.toUpperCase();
 	let parts = str.split(' ');

@@ -36,8 +36,11 @@ function validate_input(on_submit = false) {
 		return false;
 	}
 	else {
+		// console.log(parts);
 		let reduced = reduce_eq(parts);
 		console.log(reduced.join(' '));
+		let x_parts = reduce_x(reduced);
+		console.log(x_parts);
 	}
 }
 
@@ -65,13 +68,103 @@ function reduce_eq(parts) {
 	let reduced = reduce_spare(first_part).concat(['=', 0]);
 
 	return reduced;
-	// console.log(reduced);
+}
+
+function reduce_x(parts, found = -1, x_parts = []) {
+	let operators = ['+', '-', '='];
+	let start = -1;
+	let end = -1;
+	let changed = false;
+	let new_parts = [];
+	let x_part = [];
+
+	found = parts.findIndex((el, index) => {
+		return index > found && String(el).indexOf('X^') != -1;
+	});
+
+	if (found !== -1) {
+		for (start = found; start >= 0; start--) {
+			if (operators.indexOf(parts[start - 1]) != -1)
+				break ;
+		}
+		for (end = found; end < parts.length; end++) {
+			if (operators.indexOf(parts[end]) != -1)
+				break ;
+		}
+		console.log('Parts = ', parts, 'Start = ' + start, 'End = ' + end);
+		x_part = reduce_x_part(parts.slice(start, end));
+		changed = true;
+		parts = new_parts.concat(parts.slice(0, start)).concat(x_part).concat(parts.slice(end, parts.length));
+		console.log('Parts after concat', parts);
+		x_parts.push(parts.slice(start, end).join(' '));
+	}
+	if (changed)
+		return reduce_x(parts, found, x_parts);
+	return new_parts;
+}
+
+function reduce_x_part(parts) {
+	console.error('Reduce_X_PART', parts);
+	// let changed = false;
+	let to_reduce = {
+		'nums': {},
+		'vars': {}
+	};
+	for (let i = 0; i < parts.length; i++) {
+		if (!isNaN(parts[i])) {
+			to_reduce.nums[i] = parts[i];
+		}
+		else if (String(parts[i]).indexOf('X^') != -1) {
+			to_reduce.vars[i] = parts[i];
+		}
+	}
+	console.log(to_reduce);
+	let n_keys = Object.keys(to_reduce.nums);
+	let x_keys = Object.keys(to_reduce.vars);
+	for (let i = 0; i < n_keys.length; i++) {
+		let key = n_keys[i];
+		let prev_key = n_keys[i - 1];
+		let val = to_reduce.nums[key];
+		if (i > 0) {
+			let op = parts[key - 1];
+			let nb1 = parseFloat(parts[n_keys[0]]);
+			let nb2 = parseFloat(parts[key]);
+			parts[n_keys[0]] = eval(`${nb1}${op}${nb2}`);
+			console.log(`${nb1}${op}${nb2}`, 'Before reduce_spare');
+
+			parts[key] = '';
+			parts[key - 1] = '';
+			console.log('KEY = ' + key, parts);
+			// console.log('PARTS = ' + key);
+		}
+	}
+	for (let i = 0; i < x_keys.length; i++) {
+		let key = x_keys[i];
+		let val = to_reduce.vars[key];
+		if (i > 0) {
+			let op = parts[key - 1] == '*' ? '+' : '-';
+			let nb1 = parseInt(to_reduce.vars[x_keys[i - 1]].replace('X^', ''));
+			let nb2 = parseInt(to_reduce.vars[key].replace('X^', ''));
+			parts[x_keys[i - 1]] = 'X^' + eval(`${nb1}${op}${nb2}`);
+			parts[key] = '';
+			parts[key - 1] = '';
+			// parts = reduce_spare(parts);
+		}
+	}
+			parts = reduce_spare(parts);
+	return parts;
+	// found = parts.findIndex((el, index) => {
+	// 	return !isNaN(el) && index > found;
+	// });
+	// if (found != -1) {
+
+	// }
 }
 
 function reduce_spare(parts) {
 	let reduced = [];
 	let changed = false;
-	console.log(parts);
+	// console.log(parts);
 	for (let i = 0; i < parts.length; i++) {
 		if (parts[i] === '') {
 			changed = true;
@@ -113,14 +206,14 @@ function reduce_spare(parts) {
 				return (el !== '' && !isNaN(el) && index != i && !div_mult_around(parts, index));
 			});
 			if (found != -1) {
-				console.log(`CURRENT = (${parts[i]}) FOUND = (${parts[found]})`, parts);
+				// console.log(`CURRENT = (${parts[i]}) FOUND = (${parts[found]})`, parts);
 				changed = true;
 				if (found > i) {
 					reduced.push(eval(`${parts[i]}${parts[found - 1]}${parts[found]}`));
 					parts[found] = '';
 					parts[found - 1] = '';
-					if (found + 1 < parts.length)
-						parts[found + 1] = '';
+					// if (found + 1 < parts.length)
+					// 	parts[found + 1] = '';
 				}
 			}
 			else
@@ -210,14 +303,13 @@ function validate_part(part) {
 		return part;
 	else if (part.indexOf('X^') == 0 && part.indexOf('.') == -1) {
 		let nb = parseInt(part.substr(2, part.length));
-		if (nb >= 0 && nb <= 2)
+		if (nb >= 0)
 			return `X^${nb}`;
 	}
 	else if (!isNaN(part)) {
 		return parseFloat(part);
 	}
-	else
-		return false;
+	return false;
 }
 
 function on_keyup(event){

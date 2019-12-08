@@ -19,6 +19,69 @@ function hide_errors() {
 	message.classList.add('hidden');
 }
 
+function clean_regex(str) {
+	console.log("STR\n", str);
+	let patterns = [
+		{
+			pattern: /x/g,
+			repl: 'X'
+		},
+		{
+			pattern: /X\^0/g,
+			repl: '1'
+		},
+		{
+			pattern: /\ (\*|\/)\ 1 /g,
+			repl: ' '
+		},
+		{
+			pattern: /\ (\*|\/)\ 1$/g,
+			repl: ''
+		},
+		{
+			pattern: /^1\ \*/g,
+			repl: ''
+		},
+		{
+			pattern: / 1\ \*/g,
+			repl: ' '
+		},
+		{
+			pattern: /((^| )([^ ])* \* 0( |$))/g,
+			repl: ' 0 '
+		},
+		{
+			pattern: /((^| )0 (\*|\/) ([^ ])*( |$))/g,
+			repl: ' 0 '
+		},
+		{
+			pattern: /(^|((\+|\-) ))0 \-/g,
+			repl: ' - '
+		},
+		{
+			pattern: /(^|((\+|\-) ))0 \+/g,
+			repl: ' + '
+		},
+		{
+			pattern: /\- 0$/g,
+			repl: ' -'
+		},
+		{
+			pattern: /\+ 0$/g,
+			repl: ' +'
+		}
+	];
+	patterns.forEach(el => {
+		str = str.trim().replace(el.pattern, el.repl).replace(/[ ]{2,}/g, ' ').trim();
+	});
+	for (let i = 0; i < patterns.length; i++) {
+		if (patterns[i].pattern.test(str)) {
+			return (clean_regex(str));
+		}
+	}
+	return (str);
+}
+
 function validate_input(on_submit = false) {
 	let input = document.getElementById('input_text');
 	let pattern = /^[\d|\.|\=|\-|\+| |\*|\/|\^|X|x]*$/;
@@ -30,7 +93,9 @@ function validate_input(on_submit = false) {
 		show_errors(on_submit);
 		return false;
 	}
-	else if (!(parts = get_parts(input.value))) {
+	let eq = clean_regex(input.value);
+	
+	if (!(parts = get_parts(eq))) {
 		if (on_submit)
 			show_errors(on_submit);
 		return false;
@@ -39,9 +104,36 @@ function validate_input(on_submit = false) {
 		// console.log(parts);
 		let reduced = reduce_eq(parts);
 		console.log(reduced.join(' '));
-		let x_parts = reduce_x(reduced);
+		let x_parts = clean_regex(reduce_x(reduced).join(' '));
 		console.log(x_parts);
+		let no_divs = remove_divisions(x_parts.split(' '));
+		console.error(no_divs);
 	}
+}
+
+function remove_divisions(parts) {
+	for (let i = 0; i < parts.length; i++) {
+		if (parts[i] == '/') {
+			parts = add_mults(parts, parts[i + 1]);
+			parts = clean_regex(reduce_nums(reduce_x(parts)).join(' ')).split(' ');
+			return remove_divisions(parts);
+		}
+	}
+	return parts;
+}
+
+function add_mults(parts, to_mult) {
+	let operators = ['+', '-', '='];
+	let new_parts = [];
+
+	for (let i = 0; i < parts.length; i++) {
+		new_parts.push(parts[i])
+		if (!parts[i + 1] || operators.indexOf(parts[i + 1]) !== -1) {
+			new_parts = new_parts.concat(['*', to_mult])
+			// break ;
+		}
+	}
+	return new_parts;
 }
 
 function reduce_eq(parts) {
@@ -68,6 +160,27 @@ function reduce_eq(parts) {
 	let reduced = reduce_spare(first_part).concat(['=', 0]);
 
 	return reduced;
+}
+
+function reduce_nums(parts) {
+	let operators = ['*', '/', '+', '-', '='];
+	let start = 0;
+	let end = 1;
+	let new_parts = [];
+	let x_part = [];
+	let changed = false;
+
+	for (let i = 0; i < parts.length; i++) {
+		if (operators.indexOf(parts[i]) === -1 && div_mult_around(parts, i) < 1) {
+			end = i + 1;
+			x_part = reduce_x_part(parts.slice(start, end));
+			new_parts = new_parts.concat(x_part);
+			if (parts[++i])
+				new_parts.push(parts[i]);
+			start = i + 1;
+		}
+	}
+	return new_parts;
 }
 
 function reduce_x(parts, found = -1, x_parts = []) {
@@ -100,7 +213,8 @@ function reduce_x(parts, found = -1, x_parts = []) {
 	}
 	if (changed)
 		return reduce_x(parts, found, x_parts);
-	return new_parts;
+
+	return parts;
 }
 
 function reduce_x_part(parts) {
@@ -127,6 +241,9 @@ function reduce_x_part(parts) {
 		let val = to_reduce.nums[key];
 		if (i > 0) {
 			let op = parts[key - 1];
+			if (parts[n_keys[0] - 1] == '/') {
+				op = op == '/' ? '*' : '/';
+			}
 			let nb1 = parseFloat(parts[n_keys[0]]);
 			let nb2 = parseFloat(parts[key]);
 			parts[n_keys[0]] = eval(`${nb1}${op}${nb2}`);
@@ -143,15 +260,22 @@ function reduce_x_part(parts) {
 		let val = to_reduce.vars[key];
 		if (i > 0) {
 			let op = parts[key - 1] == '*' ? '+' : '-';
-			let nb1 = parseInt(to_reduce.vars[x_keys[i - 1]].replace('X^', ''));
+			if (parts[x_keys[0] - 1] == '/') {
+				op = op == '-' ? '+' : '-';
+			}
+			let nb1 = parseInt(parts[x_keys[0]].replace('X^', ''));
 			let nb2 = parseInt(to_reduce.vars[key].replace('X^', ''));
-			parts[x_keys[i - 1]] = 'X^' + eval(`${nb1}${op}${nb2}`);
+			console.log(`${nb1} ${op} ${nb2}`);
+			parts[x_keys[0]] = 'X^' + eval(`${nb1} ${op} ${nb2}`);
 			parts[key] = '';
 			parts[key - 1] = '';
+			console.log('This is parts\n', parts);
 			// parts = reduce_spare(parts);
 		}
 	}
-			parts = reduce_spare(parts);
+	parts = clean_regex(parts.join(' ')).split(' ');
+	parts = reduce_spare(parts);
+	console.log('return x-part\n', parts);
 	return parts;
 	// found = parts.findIndex((el, index) => {
 	// 	return !isNaN(el) && index > found;
@@ -170,37 +294,37 @@ function reduce_spare(parts) {
 			changed = true;
 			continue ;
 		}
-		else if (parts[i] == 'X^0') {
-			reduced.push(1);
-			changed = true;
-		}
-		else if (i < parts.length - 2 && parts[i + 1] == '*' && (parts[i] === 0 || parts[i + 2] === 0)) {
-			reduced.push(0);
-			changed = true;
-			i += 2;
-		}
-		else if (i < parts.length - 2 && (parts[i + 1] == '*' || parts[i + 1] == '/') && !isNaN(parts[i]) && !isNaN(parts[i + 2])) {
-			reduced.push(eval(`${parts[i]}${parts[i + 1]}${parts[i + 2]}`));
-			changed = true;
-			i += 2;
-		}
-		else if (i < parts.length - 2 && (parts[i + 1] == '*' || (parts[i + 1] == '/' && parts[i + 2] == 1)) && (parts[i] == 1 || parts[i + 2] == 1)) {
-			let to_push = parts[i] == 1 ? parts[i + 2] : parts[i];
-			if (to_push == 'X^0')
-				to_push = 1;
-			reduced.push(to_push);
-			changed = true;
-			i += 2;
-		}
-		else if (i < parts.length - 2 && (parts[i + 1] == '*' || parts[i + 1] == '/') && isNaN(parts[i]) && isNaN(parts[i + 2]) &&
-				parts[i].indexOf('X^') == 0 && parts[i + 2].indexOf('X^') == 0) {
-			let op = parts[i + 1] == '*' ? '+' : '-';
-			let nb1 = parseInt(parts[i].substr(2, parts[i].length));
-			let nb2 = parseInt(parts[i + 2].substr(2, parts[i + 2].length));
-			reduced.push('X^' + eval(`${nb1}${op}${nb2}`));
-			changed = true;
-			i += 2;
-		}
+		// else if (parts[i] == 'X^0') {
+		// 	reduced.push(1);
+		// 	changed = true;
+		// }
+		// else if (i < parts.length - 2 && parts[i + 1] == '*' && (parts[i] === 0 || parts[i + 2] === 0)) {
+		// 	reduced.push(0);
+		// 	changed = true;
+		// 	i += 2;
+		// }
+		// else if (i < parts.length - 2 && (parts[i + 1] == '*' || parts[i + 1] == '/') && !isNaN(parts[i]) && !isNaN(parts[i + 2])) {
+		// 	reduced.push(eval(`${parts[i]}${parts[i + 1]}${parts[i + 2]}`));
+		// 	changed = true;
+		// 	i += 2;
+		// }
+		// else if (i < parts.length - 2 && (parts[i + 1] == '*' || (parts[i + 1] == '/' && parts[i + 2] == 1)) && (parts[i] == 1 || parts[i + 2] == 1)) {
+		// 	let to_push = parts[i] == 1 ? parts[i + 2] : parts[i];
+		// 	if (to_push == 'X^0')
+		// 		to_push = 1;
+		// 	reduced.push(to_push);
+		// 	changed = true;
+		// 	i += 2;
+		// }
+		// else if (i < parts.length - 2 && (parts[i + 1] == '*' || parts[i + 1] == '/') && isNaN(parts[i]) && isNaN(parts[i + 2]) &&
+		// 		parts[i].indexOf('X^') == 0 && parts[i + 2].indexOf('X^') == 0) {
+		// 	let op = parts[i + 1] == '*' ? '+' : '-';
+		// 	let nb1 = parseInt(parts[i].substr(2, parts[i].length));
+		// 	let nb2 = parseInt(parts[i + 2].substr(2, parts[i + 2].length));
+		// 	reduced.push('X^' + eval(`${nb1}${op}${nb2}`));
+		// 	changed = true;
+		// 	i += 2;
+		// }
 		else if (!isNaN(parts[i]) && !div_mult_around(parts, i)) {
 			let found = parts.findIndex((el, index) => {
 				return (el !== '' && !isNaN(el) && index != i && !div_mult_around(parts, index));

@@ -1,3 +1,6 @@
+// 30 - 8 * X^1 - X^1 / 5 +  0   * X^2 - X^1 * 11.2 / 5.6 / X^3 * 3 / 15 * X^2 / 1.12 = 3 * X^0
+var g_change = false;
+
 function show_errors(on_submit = false) {
 	let message = document.getElementById('validation_message');
 	let input = document.getElementById('input_text');
@@ -72,6 +75,10 @@ function clean_regex(str) {
 		}
 	];
 	patterns.forEach(el => {
+		if (el.pattern.test(str)) {
+			console.error('Changed')
+			g_change = true;
+		}
 		str = str.trim().replace(el.pattern, el.repl).replace(/[ ]{2,}/g, ' ').trim();
 	});
 	for (let i = 0; i < patterns.length; i++) {
@@ -82,18 +89,20 @@ function clean_regex(str) {
 	return (str);
 }
 
-function validate_input(on_submit = false) {
-	let input = document.getElementById('input_text');
+function validate_input(str, on_submit = false, count = 0) {
+	console.log(str);
+	// let input = document.getElementById('input_text');
 	let pattern = /^[\d|\.|\=|\-|\+| |\*|\/|\^|X|x]*$/;
 	let operators = ['*', '/', '+', '-'];
 	let parts = false;
 
+	g_change = false;
 	hide_errors();
-	if (!input || !input.value || !pattern.test(input.value)) {
+	if (!str || !pattern.test(str)) {
 		show_errors(on_submit);
 		return false;
 	}
-	let eq = clean_regex(input.value);
+	let eq = clean_regex(str);
 	
 	if (!(parts = get_parts(eq))) {
 		if (on_submit)
@@ -108,12 +117,100 @@ function validate_input(on_submit = false) {
 		console.log(x_parts);
 		let no_divs = remove_divisions(x_parts.split(' '));
 		console.error(no_divs);
+		let final = reduce_final(no_divs.slice(0, no_divs.indexOf('='))).concat(['=', 0]);
+		// let no_spare = reduce_eq(no_divs);
+		console.log(final);
+		if (g_change && count < 10)
+			return validate_input(final.join(' '), on_submit, ++count);
+		console.log(`COUNT = (${count})`);
+		return final;
 	}
+	
+}
+
+function reduce_final(parts) {
+	let found1 = false;
+	let found2 = false;
+	let new_parts = [];
+	let pow = -1;
+	for (let pow = 0; pow < 3; pow++) {
+		if ((found1 = get_x_part(parts, pow, 0)) && (found2 = get_x_part(parts, pow, found1.end + 1))) {
+			console.log(found1, found2);
+			let factor1 = get_x_factor(found1.part);
+			let factor2 = get_x_factor(found2.part);
+			console.log(factor1, factor2);
+			let op = parts[found2.start - 1];
+			if (parts[found1.start - 1] == '-') {
+				op = op == '-' ? '+' : '-';
+			}
+			let res = eval(`${factor1} ${op} ${factor2}`)
+			new_parts = parts.slice(0, found1.start);
+			new_parts = new_parts.concat(pow == 0 ? [res] : [res, '*', `X^${pow}`]);
+			new_parts = new_parts.concat(parts.slice(found1.end, found2.start - 1)).concat(parts.slice(found2.end, parts.length + 1));
+			g_change = true;
+			return reduce_final(new_parts);
+		}
+	}
+	return parts;
+}
+
+function get_x_factor(part) {
+	// let res = 1;
+	for (let i = 0; i < part.length; i++) {
+		if (!isNaN(part[i]))
+			return (parseFloat(part[i]));
+	}
+	return 1;
+}
+
+function get_x_part(parts, pow, index) {
+	let operators = ['+', '-', '*', '/', '='];
+	let start = index;
+	for (let i = index; i < parts.length; i++) {
+		if (operators.indexOf(parts[i]) === -1 && div_mult_around(parts, i) < 1) {
+			let found = -1;
+			if (pow == 0) {
+				found = parts.slice(start, i + 1).findIndex((el) => {
+					return String(el).indexOf('X^') !== -1;
+				});
+				if (found !== -1) {
+					i++;
+					start = i + 1;
+					continue ;
+				}
+				else {
+					return {
+						part: parts.slice(start, i + 1),
+						start: start,
+						end: i + 1
+					}
+				}
+			}
+			else {
+				found = parts.slice(start, i + 1).indexOf(`X^${pow}`);
+				if (found === -1) {
+					i++;
+					start = i + 1;
+					continue ;
+				}
+				else {
+					return {
+						part: parts.slice(start, i + 1),
+						start: start,
+						end: i + 1
+					}
+				}
+			}
+		}
+	}
+	return false;
 }
 
 function remove_divisions(parts) {
 	for (let i = 0; i < parts.length; i++) {
 		if (parts[i] == '/') {
+			g_change = true;
+			console.error('Changed');
 			parts = add_mults(parts, parts[i + 1]);
 			parts = clean_regex(reduce_nums(reduce_x(parts)).join(' ')).split(' ');
 			return remove_divisions(parts);
@@ -143,6 +240,8 @@ function reduce_eq(parts) {
 	let len = 1;
 	for (let i = second_part.length - 1; i >= 0; i--) {
 		if (second_part[i] == '-' || second_part[i] == '+') {
+			console.error('Changed');
+			g_change = true;
 			first_part.push(second_part[i] == '-' ? '+' : '-');
 			len = 1;
 		}
@@ -155,6 +254,8 @@ function reduce_eq(parts) {
 			first_part = first_part.concat(second_part.slice(i, i + len));
 			i--;
 			len = 1;
+			// console.error('Changed');
+			// g_change = true;
 		}
 	}
 	let reduced = reduce_spare(first_part).concat(['=', 0]);
@@ -194,9 +295,12 @@ function reduce_x(parts, found = -1, x_parts = []) {
 	found = parts.findIndex((el, index) => {
 		return index > found && String(el).indexOf('X^') != -1;
 	});
-
+	start = found;
+	console.log(`FOUND = (${found})`);
 	if (found !== -1) {
 		for (start = found; start >= 0; start--) {
+			console.log(`START = (${start})`);
+
 			if (operators.indexOf(parts[start - 1]) != -1)
 				break ;
 		}
@@ -204,9 +308,15 @@ function reduce_x(parts, found = -1, x_parts = []) {
 			if (operators.indexOf(parts[end]) != -1)
 				break ;
 		}
+		if (start < 0)
+			start = 0;
 		console.log('Parts = ', parts, 'Start = ' + start, 'End = ' + end);
 		x_part = reduce_x_part(parts.slice(start, end));
 		changed = true;
+		// if (parts.slice(start, end).length != x_part.length) {
+		// 	g_change = true;
+		// console.error('Changed');
+		// }
 		parts = new_parts.concat(parts.slice(0, start)).concat(x_part).concat(parts.slice(end, parts.length));
 		console.log('Parts after concat', parts);
 		x_parts.push(parts.slice(start, end).join(' '));
@@ -219,7 +329,6 @@ function reduce_x(parts, found = -1, x_parts = []) {
 
 function reduce_x_part(parts) {
 	console.error('Reduce_X_PART', parts);
-	// let changed = false;
 	let to_reduce = {
 		'nums': {},
 		'vars': {}
@@ -251,8 +360,9 @@ function reduce_x_part(parts) {
 
 			parts[key] = '';
 			parts[key - 1] = '';
+			g_change = true;
+			console.error('Changed');
 			console.log('KEY = ' + key, parts);
-			// console.log('PARTS = ' + key);
 		}
 	}
 	for (let i = 0; i < x_keys.length; i++) {
@@ -269,6 +379,8 @@ function reduce_x_part(parts) {
 			parts[x_keys[0]] = 'X^' + eval(`${nb1} ${op} ${nb2}`);
 			parts[key] = '';
 			parts[key - 1] = '';
+			g_change = true;
+			console.error('Changed');
 			console.log('This is parts\n', parts);
 			// parts = reduce_spare(parts);
 		}
@@ -277,108 +389,44 @@ function reduce_x_part(parts) {
 	parts = reduce_spare(parts);
 	console.log('return x-part\n', parts);
 	return parts;
-	// found = parts.findIndex((el, index) => {
-	// 	return !isNaN(el) && index > found;
-	// });
-	// if (found != -1) {
-
-	// }
 }
 
 function reduce_spare(parts) {
 	let reduced = [];
 	let changed = false;
-	// console.log(parts);
 	for (let i = 0; i < parts.length; i++) {
 		if (parts[i] === '') {
+			// console.error('Changed');
+			// g_change = true;
 			changed = true;
 			continue ;
 		}
-		// else if (parts[i] == 'X^0') {
-		// 	reduced.push(1);
-		// 	changed = true;
-		// }
-		// else if (i < parts.length - 2 && parts[i + 1] == '*' && (parts[i] === 0 || parts[i + 2] === 0)) {
-		// 	reduced.push(0);
-		// 	changed = true;
-		// 	i += 2;
-		// }
-		// else if (i < parts.length - 2 && (parts[i + 1] == '*' || parts[i + 1] == '/') && !isNaN(parts[i]) && !isNaN(parts[i + 2])) {
-		// 	reduced.push(eval(`${parts[i]}${parts[i + 1]}${parts[i + 2]}`));
-		// 	changed = true;
-		// 	i += 2;
-		// }
-		// else if (i < parts.length - 2 && (parts[i + 1] == '*' || (parts[i + 1] == '/' && parts[i + 2] == 1)) && (parts[i] == 1 || parts[i + 2] == 1)) {
-		// 	let to_push = parts[i] == 1 ? parts[i + 2] : parts[i];
-		// 	if (to_push == 'X^0')
-		// 		to_push = 1;
-		// 	reduced.push(to_push);
-		// 	changed = true;
-		// 	i += 2;
-		// }
-		// else if (i < parts.length - 2 && (parts[i + 1] == '*' || parts[i + 1] == '/') && isNaN(parts[i]) && isNaN(parts[i + 2]) &&
-		// 		parts[i].indexOf('X^') == 0 && parts[i + 2].indexOf('X^') == 0) {
-		// 	let op = parts[i + 1] == '*' ? '+' : '-';
-		// 	let nb1 = parseInt(parts[i].substr(2, parts[i].length));
-		// 	let nb2 = parseInt(parts[i + 2].substr(2, parts[i + 2].length));
-		// 	reduced.push('X^' + eval(`${nb1}${op}${nb2}`));
-		// 	changed = true;
-		// 	i += 2;
-		// }
 		else if (!isNaN(parts[i]) && !div_mult_around(parts, i)) {
 			let found = parts.findIndex((el, index) => {
 				return (el !== '' && !isNaN(el) && index != i && !div_mult_around(parts, index));
 			});
 			if (found != -1) {
-				// console.log(`CURRENT = (${parts[i]}) FOUND = (${parts[found]})`, parts);
+				if (found > i && parts[found - 1] != '=') {
 				changed = true;
-				if (found > i) {
-					reduced.push(eval(`${parts[i]}${parts[found - 1]}${parts[found]}`));
+					let op = parts[found - 1];
+					reduced.push(eval(`${parts[i]} ${op} ${parts[found]}`));
 					parts[found] = '';
 					parts[found - 1] = '';
-					// if (found + 1 < parts.length)
-					// 	parts[found + 1] = '';
 				}
 			}
 			else
 				reduced.push(parts[i]);
 		}
-		// else if (isNaN(parts[i]) && parts[i].indexOf('X^') != -1) {
-		// 	let div_mults = div_mult_around(parts, i);
-		// 	let mults = mult_around(parts, i);
-
-		// 	if (div_mults == 2 && parts[i - 1] == '*') {
-		// 		reduced[reduced.length - 2] = eval(`${reduced[reduced.length - 2]}${parts[i + 1]}${parts[i + 2]}`);
-		// 		parts[i + 2] = 1;
-		// 		changed = true;
-		// 		i += 2;
-		// 	}
-		// 	else {
-		// 		let found = parts[i].findIndex((el, index) => {
-		// 			return (el == parts[i] && i != index && div_mult_around(parts, index) != 0 && div_mult_around(parts, index) != 2); 
-		// 		});
-		// 		if (found != -1) {
-		// 			changed = true;
-		// 			let factor1 = 1;
-		// 			if (mults == -1)
-		// 				factor1 = parts[i - 2];
-		// 			else if (mults == 1)
-		// 				factor1 = parts[i + 2];
-		// 		}
-		// 	}
-		// }
 		else {
 			reduced.push(parts[i]);
 		}
 	}
-	// if (reduced.join(' ').indexOf('* 1 ') != -1 || reduced.join(' ').indexOf(' 1 * ') != -1 ||
-	// 	reduced.join(' ').indexOf('* 1') == reduced.join(' ').length - 3 ||
-	// 	reduced.join(' ').indexOf('1 *') == 0) {
-		
-	// 	return reduce_spare(reduced);	
-	// }
-	if (changed)
+	if (changed) {
+		// console.log(reduced, parts);
+		// console.error('Changed');
+		// g_change = true;
 		return reduce_spare(reduced);
+	}
 	else
 		return reduced;
 }
@@ -437,14 +485,18 @@ function validate_part(part) {
 }
 
 function on_keyup(event){
+	// console.log(g_change);
+	let input = document.getElementById('input_text');
 	if (event.keyCode == 13)
 		solve_eq();
 	else
-		validate_input();
+		validate_input(input.value);
 }
 
 function solve_eq() {
+	let input = document.getElementById('input_text');
 	let parts = false;
-	if (!(parts = validate_input(true)))
+
+	if (!(parts = validate_input(input.value, true)))
 		return ;
 }

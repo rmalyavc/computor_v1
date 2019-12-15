@@ -5,6 +5,12 @@
 	justify-content: center;
 }
 
+.results {
+	padding-top: 20px;
+	display: block;
+	text-align: center;
+}
+
 .inner_wrapper {
 	width: 100%;
 	max-width: 500px;

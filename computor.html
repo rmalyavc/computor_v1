@@ -10,13 +10,16 @@
 		<div class="inner_wrapper">
 			<h4>Please enter your equation here:</h4>
 			<h4>
-				<input id="input_text" class="form_field" onkeyup="on_keyup(event);">
+				<input id="input_text" class="form_field" >
 				<span class="error_text hidden" id="validation_message">Invalid format</span>
 			</h4>
 			<div class="wrapper">
 				<button type="button" id="submit_input" class="main_button" onclick="solve_eq();">
 					<strong>Solve</strong>
 				</button>
+			</div>
+			<div class="wrapper results" id="results">
+				<h2>Results:</h2>
 			</div>
 		</div>
 	</div>

@@ -1,6 +1,8 @@
 // 30 - 8 * X^1 - X^1 / 5 +  0   * X^2 - X^1 * 11.2 / 5.6 / X^3 * 3 / 15 * X^2 / 1.12 = 3 * X^0
 // 30 - 8 * X^1 - X^1  +  0   * X^2 - X^1 * 11.2 / 5.6 / X^3 * 3 / 15 * X^2 / 1.12 - X^1 * 6 = 3 * X^1 - 5 * X^2 + 100
+// "5 - 6 / x * 5x = 2"
 var g_change = false;
+var allow_zero = true;
 
 function show_errors(on_submit = false, error = false) {
 	let message = document.getElementById('validation_message');
@@ -60,7 +62,6 @@ function check_empty(el) {
 }
 
 function clean_regex(str) {
-	// console.log("STR\n", str);
 	let patterns = [
 		{
 			pattern: /x/g,
@@ -176,11 +177,11 @@ function validate_input(str, on_submit = false, count = 0) {
 		let final = reduce_final(no_divs.slice(0, no_divs.indexOf('='))).concat(['=', 0]);
 		if (final.join(' ') != no_divs.join(' '))
 			show_result(final.join(' '));
-		console.log(final);
 		if (g_change && count < 10)
 			return validate_input(final.join(' '), on_submit, ++count);
-		console.log(`COUNT = (${count})`);
-
+		else if (/X\^-/.test(final.join(' '))) {
+			return validate_input(final.join(' ').replace(/X\^-/, '1 / X^'), on_submit, count);
+		}
 		show_result('Final reduced form:');
 		show_result(final.join(' '));
 		return final;
@@ -289,11 +290,13 @@ function add_mults(parts, to_mult) {
 	let operators = ['+', '-', '='];
 	let new_parts = [];
 
+	if (String(to_mult).indexOf('X^') !== -1) {
+		allow_zero = false;
+	}
 	for (let i = 0; i < parts.length; i++) {
 		new_parts.push(parts[i])
 		if (!parts[i + 1] || operators.indexOf(parts[i + 1]) !== -1) {
 			new_parts = new_parts.concat(['*', to_mult])
-			// break ;
 		}
 	}
 	return new_parts;
@@ -449,7 +452,12 @@ function reduce_spare(parts) {
 				if (found > i && parts[found - 1] != '=') {
 				changed = true;
 					let op = parts[found - 1];
-					reduced.push(eval(`${parts[i]} ${op} ${parts[found]}`));
+					let nb1 = parseFloat(parts[i]);
+					let nb2 = parseFloat(parts[found]);
+					if (parts[i - 1] == '-') {
+						op = op == '-' ? '+' : '-';
+					}
+					reduced.push(eval(`${nb1} ${op} ${nb2}`));
 					parts[found] = '';
 					parts[found - 1] = '';
 				}
@@ -488,12 +496,12 @@ function mult_around(arr, i) {
 	else
 		return 0;
 }
-// "5 - 6 / x * 5x = 2"
+
 function get_parts(str) {
 	str = str.toUpperCase();
 	let parts = str.split(' ');
-	console.log(parts);
-	if (parts.indexOf('=') < 1 || parts.indexOf('=') != parts.lastIndexOf('=') || parts.length < 3) {
+	if (parts.indexOf('=') < 1 || parts.indexOf('=') == parts.length - 1 ||
+		parts.indexOf('=') != parts.lastIndexOf('=') || parts.length < 3) {
 		return false;
 	}
 	for (let i = 0; i < parts.length; i++) {
@@ -513,9 +521,7 @@ function validate_part(part) {
 		return part;
 	else if (part.indexOf('X^') == 0 && part.indexOf('.') == -1) {
 		let nb = parseInt(part.substr(2, part.length));
-		console.log(part, nb);
-		// if (nb >= 0)
-			return `X^${nb}`;
+		return `X^${nb}`;
 	}
 	else if (!isNaN(part)) {
 		return parseFloat(part);
@@ -524,7 +530,6 @@ function validate_part(part) {
 }
 
 function on_keyup(event){
-	// console.log(g_change);
 	let input = document.getElementById('input_text');
 	if (event.keyCode == 13)
 		solve_eq();
@@ -542,6 +547,7 @@ function solve_eq() {
 	let b = 0;
 	let c = 0;
 
+	allow_zero = true;
 	document.getElementById('results').innerHTML = '<h2>Results:</h2>';
 	if (!(parts = validate_input(input.value, true))) {
 		console.log('Validation is not passed');
@@ -564,19 +570,30 @@ function solve_eq() {
 	}
 	let degree = get_degree(parts);
 	show_result(`Polynomial degree: ${degree}`);
-	if (degree < 0 || degree > 2) {
-		let message_part = degree < 0 ? 'less than 0' : 'greater than 2';
-		show_result(`The polynomial degree is stricly ${message_part}, I can't solve.`);
+	if (degree > 2) {
+		show_result(`The polynomial degree is stricly greater than 2, I can't solve.`);
 		return false;
 	}
 	if (a != 0) {
 		let discr = b * b - 4 * a * c;
+		show_result(`Discriminant is ${discr}`);
 		if (discr == 0) {
-			results.push(b * -1 / 2 * a);
+			if (allow_zero || b * -1 / (2 * a) != 0)
+				results.push(b * -1 / (2 * a));
 		}
 		else if (discr > 0) {
-			results.push(((b * -1) + Math.sqrt(discr)) / (2 * a));
-			results.push(((b * -1) - Math.sqrt(discr)) / (2 * a));
+			let x1 = ((b * -1) + Math.sqrt(discr)) / (2 * a);
+			let x2 = ((b * -1) - Math.sqrt(discr)) / (2 * a);
+			if (allow_zero || x1 != 0)
+				results.push(x1);
+			if (allow_zero || x2 != 0)
+				results.push(x2);
+		}
+		else {
+			show_result(`Discriminant is negative. Solving with complex numbers.`);
+			discr *= -1;
+			results.push((b * -1 / (2 * a)) + ' + ' + (Math.sqrt(discr) / (2 * a)) + ' * i');
+			results.push((b * -1 / (2 * a)) + ' - ' + (Math.sqrt(discr) / (2 * a)) + ' * i');
 		}
 	}
 	else if (b != 0) {
@@ -588,10 +605,12 @@ function solve_eq() {
 			b *= -1;
 		if (found1 && parts[found1.start - 1] != '-')
 			c *= -1;
-		results.push(c / b);
+		if (b != 0 && (c / b != 0 || allow_zero))
+			results.push(c / b);
 	}
 	else if (c == 0) {
-		results.push('Any real number');
+		let answer_part = !allow_zero ? ', except 0' : '';
+		results.push(`Any real number${answer_part}`);
 	}
 	if (!results.length) {
 		show_result('The equation has no solution');
@@ -601,14 +620,10 @@ function solve_eq() {
 		results.forEach((el) => {
 			show_result(el);
 		});
-		// show_result('The equation has no solution');
 	}
-	console.log('RESULTS!!!', results);
-	// return results;
 }
 
 function get_degree(parts) {
-	// console.log(parts);
 	let degree = 0;
 	for (let i = 0; i < parts.length; i++) {
 		if (String(parts[i]).indexOf('X^') !== -1) {
